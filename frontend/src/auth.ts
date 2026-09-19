@@ -1,9 +1,35 @@
-import { apiUrl, readApiJson } from './api';
+import { ApiResponseError, apiUrl, readApiJson } from './api';
 
 export type AuthUser = { id: string; username: string };
+// APSRTC may make two payload attempts and retry once (up to ~48 seconds with
+// current backend defaults). Keep a finite deadline while allowing proxy and
+// processing overhead; an alternate contact receives its own request deadline.
+export const API_REQUEST_TIMEOUT_MS = 120_000;
 
 export async function authFetch(path: string, init: RequestInit = {}) {
-  return fetch(apiUrl(path), { ...init, credentials: 'include', headers: { ...(init.headers || {}) } });
+  const controller = new AbortController();
+  const parentSignal = init.signal;
+  const abortForParent = () => controller.abort();
+  if (parentSignal?.aborted) controller.abort();
+  else parentSignal?.addEventListener('abort', abortForParent, { once: true });
+
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new ApiResponseError('The request took too long. Please try again.'));
+    }, API_REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([
+      fetch(apiUrl(path), { ...init, credentials: 'include', headers: { ...(init.headers || {}) }, signal: controller.signal }),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timeoutId!);
+    parentSignal?.removeEventListener('abort', abortForParent);
+  }
 }
 
 export async function currentUser() {
