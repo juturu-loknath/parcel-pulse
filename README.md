@@ -70,7 +70,7 @@ The service worker caches the app shell only. Tracking API responses, phone numb
 
 ## Deployment (Vercel + FastAPI)
 
-Deploy `frontend/` to Vercel with build command `npm run build` and output directory `dist`. Configure `VITE_API_BASE_URL` in Vercel to the HTTPS origin of the separately deployed FastAPI API, then redeploy so Vite embeds that public build-time value.
+Deploy `frontend/` to Vercel with build command `npm run build` and output directory `dist`. Its `vercel.json` proxies browser-relative `/api/...` requests to the Render backend, keeping the browser-visible origin and HttpOnly session cookie first-party. Leave `VITE_API_BASE_URL` unset in Vercel; setting it would bypass that proxy.
 
 Deploy `backend/` on a Python host that supports outbound HTTPS requests and persistent environment variables. Set:
 
