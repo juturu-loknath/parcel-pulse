@@ -1,0 +1,7 @@
+/* Telugu, English, and bilingual labels must wrap inside cards instead of making
+   narrow Android viewports scroll horizontally. */
+main,.brand,.language,.header-actions,.card,.saved,.notice,.result-top>div,.event>div,.parcel>div{min-width:0}
+button{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+.brand>span:last-child,.ocr-confirm span,.route,.event span,.parcel span,.parcel em{overflow-wrap:anywhere}
+.language select{max-width:88px}.header-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}.result-top{align-items:flex-start}.save{height:auto;min-height:40px;flex:0 1 132px;line-height:1.3}.route{flex-wrap:wrap}.icon:disabled,.save:disabled{cursor:wait;opacity:.7}
+@media(max-width:359px){main{padding-left:12px;padding-right:12px}.hero{padding:22px}.card,.saved,.notice{padding:16px}.brand{font-size:19px}.language select{max-width:76px}.header-actions{gap:4px}.header-actions .language>svg,.header-actions .home-action>span{display:none}.header-actions .home-action{padding:8px}}

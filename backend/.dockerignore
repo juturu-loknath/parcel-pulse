@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+*.db
+test-*.db
+.env
+private-receipts
+private-backups
