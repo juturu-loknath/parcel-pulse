@@ -2,8 +2,9 @@ import hmac, os, re, uuid
 from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.auth import CurrentUser, clear_failed_logins, clear_session, csrf_protect, hash_password, login_is_blocked, normalize_username, record_failed_login, set_session, signup_request_key, verify_password, within_signup_transaction
+from app.auth import CurrentUser, clear_failed_logins, clear_session, csrf_protect, hash_password, login_is_blocked, normalize_username, record_failed_login, set_session, signup_request_key, verify_password
 from app.models.database import Base, Parcel, SessionLocal, User, engine
 from app.models.schemas import AuthenticatedUser, CheckSavedParcelRequest, LoginRequest, OCRResponse, SaveParcelRequest, SavedParcel, SignupRequest, TrackRequest, TrackingResponse
 from app.providers.apsrtc import APSRTCProvider, ProviderError
@@ -54,18 +55,21 @@ def signup(payload: SignupRequest, request: Request, response: Response, session
     if not enabled or not configured_code or not hmac.compare_digest(payload.signup_code, configured_code):
         record_failed_login(session, signup_key, "signup")
         raise HTTPException(403, "Sign-up is currently unavailable or the code is incorrect.")
-    with within_signup_transaction(session):
-        # The PostgreSQL advisory lock remains held through commit, preventing
-        # concurrent requests from both claiming the final available slot.
-        if session.query(User).count() >= 2:
-            raise HTTPException(409, "Private account capacity has been reached.")
-        username = normalize_username(payload.username)
+    username = normalize_username(payload.username)
+    if session.query(User).filter_by(username=username).first() is not None:
+        raise HTTPException(409, "That username is unavailable.")
+    user = User(username=username, password_hash=hash_password(payload.password))
+    session.add(user)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        # The database unique constraint is authoritative if two requests race
+        # for the same username.
         if session.query(User).filter_by(username=username).first() is not None:
             raise HTTPException(409, "That username is unavailable.")
-        user = User(username=username, password_hash=hash_password(payload.password))
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        raise
+    session.refresh(user)
     clear_failed_logins(session, signup_key, "signup")
     set_session(response, user)
     return AuthenticatedUser(id=user.id, username=user.username)

@@ -6,13 +6,11 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import os
-from threading import Lock
 from typing import Annotated
 
 import jwt
 from fastapi import Depends, HTTPException, Request, Response
 from pwdlib import PasswordHash
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.database import LoginAttempt, SessionLocal, User
@@ -22,7 +20,6 @@ PASSWORD_HASHER = PasswordHash.recommended()
 SESSION_HOURS = int(os.getenv("SESSION_HOURS", "12"))
 MAX_LOGIN_FAILURES = int(os.getenv("MAX_LOGIN_FAILURES", "5"))
 LOGIN_WINDOW_MINUTES = int(os.getenv("LOGIN_WINDOW_MINUTES", "15"))
-SIGNUP_LOCK = Lock()
 
 def auth_secret() -> str:
     secret = os.getenv("SESSION_SECRET")
@@ -108,18 +105,3 @@ def signup_request_key(request: Request) -> str:
     # up trusted proxy middleware. The direct peer IP is enough for this small,
     # private signup gate.
     return request.client.host if request.client else "unknown"
-
-def within_signup_transaction(session: Session):
-    """Serialize the two-account check with creation.
-
-    PostgreSQL advisory transaction locks coordinate all backend workers. The
-    in-process lock gives SQLite development/tests the same behavior.
-    """
-    if session.bind and session.bind.dialect.name == "postgresql":
-        session.execute(text("select pg_advisory_xact_lock(82491371)"))
-        return _NoopLock()
-    return SIGNUP_LOCK
-
-class _NoopLock:
-    def __enter__(self): return self
-    def __exit__(self, *_): return False

@@ -1,5 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -44,21 +42,14 @@ def test_signup_accepts_a_simple_nonempty_password_and_can_log_in(signup_setup):
     assert signup_setup.post("/api/auth/login", json={"username": "newuser", "password": "a"}).status_code == 200
 
 
-def test_signup_stops_at_two_private_accounts(signup_setup):
+def test_approved_signups_are_not_subject_to_a_fixed_account_cap(signup_setup):
     assert signup(signup_setup, "firstuser").status_code == 201
     assert signup(signup_setup, "seconduser").status_code == 201
-    assert signup(signup_setup, "thirduser").status_code == 409
+    assert signup(signup_setup, "thirduser").status_code == 201
 
-
-def test_concurrent_signup_attempts_cannot_exceed_two_accounts(signup_setup):
-    def attempt(number):
-        return signup(TestClient(signup_setup.app), f"person{number}").status_code
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        statuses = list(executor.map(attempt, range(4)))
-
-    assert statuses.count(201) == 2
-    assert statuses.count(409) == 2
+    from app.models.database import engine
+    with engine.connect() as connection:
+        assert connection.execute(text("select count(*) from users")).scalar_one() == 3
 
 
 def test_signup_attempts_are_throttled(signup_setup):

@@ -85,7 +85,7 @@ SQLite remains the zero-configuration local default. PostgreSQL URLs from common
 
 ParcelPulse uses FastAPI-managed username/password accounts, not Supabase Auth. The production database starts empty; do not point a migration at a legacy SQLite file. Set `DATABASE_URL` to the Supabase PostgreSQL connection string, `ENVIRONMENT=production`, a unique `SESSION_SECRET` of at least 32 random bytes, and `AUTH_COOKIE_SECURE=true`. Run `alembic -c backend/alembic.ini upgrade head` once against the empty cloud database.
 
-Sign-up is off by default. To let the second private user create an account, set `SIGNUP_ENABLED=true` and a random `PRIVATE_SIGNUP_CODE` only in the backend host's secret environment. The code never belongs in Vercel, source control, logs, or the frontend. The backend verifies it in constant time, throttles failed attempts, and serializes signup requests so a maximum of two accounts can exist. Once both accounts are created, set `SIGNUP_ENABLED=false` (or remove both signup variables) and restart the backend. Existing signed-in sessions and accounts remain valid. Passwords must be non-empty and are hashed with Argon2id; the UI gives non-blocking guidance for easily guessed passwords.
+Sign-up is off by default. To let an approved private user create an account, set `SIGNUP_ENABLED=true` and a random `PRIVATE_SIGNUP_CODE` only in the backend host's secret environment. The code never belongs in Vercel, source control, logs, or the frontend. The backend verifies it in constant time and throttles failed attempts. There is no fixed application account cap; enable this gate only while an invited person is signing up, then set `SIGNUP_ENABLED=false` (or remove both signup variables) and restart the backend. Existing signed-in sessions and accounts remain valid. Passwords must be non-empty and are hashed with Argon2id; the UI gives non-blocking guidance for easily guessed passwords.
 
 For cookie reliability, use HTTPS custom subdomains under the same site, such as `app.example.com` on Vercel and `api.example.com` for FastAPI. Configure `CORS_ORIGINS` with the exact app URL. There is no public password-reset endpoint; an administrator verifies the person out of band, then runs `cd backend && python -m scripts.reset_password` on a trusted machine.
 
@@ -120,7 +120,7 @@ This project uses the [MIT License](LICENSE), a permissive license suitable for 
 
 ## Future work
 
-- Optional account-management improvements beyond the two-user private model
+- Optional account-management improvements beyond the private invite-only model
 - Permissioned background scheduler and Web Push subscription delivery
 - More receipt templates and OCR accuracy evaluation
 - Additional carrier providers through the existing provider interface
